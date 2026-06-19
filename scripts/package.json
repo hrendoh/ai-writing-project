@@ -1,0 +1,12 @@
+{
+  "name": "ai-writing-agent-scripts",
+  "private": true,
+  "type": "module",
+  "description": "Utility scripts for the AI writing agent project",
+  "dependencies": {
+    "@mozilla/readability": "^0.6.0",
+    "jsdom": "^29.1.1",
+    "turndown": "^7.2.4",
+    "turndown-plugin-gfm": "^1.0.2"
+  }
+}
