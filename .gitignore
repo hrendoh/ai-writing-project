@@ -1,3 +1,7 @@
 # Node.js (scripts/)
 node_modules/
 npm-debug.log*
+
+# 文体トーン抽出用のサンプル記事（著作物のコピーのためコミットしない）
+# 手順: 00_rules/style_extraction_procedure.md
+00_rules/style_samples/
