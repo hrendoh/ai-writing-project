@@ -1,3 +1,6 @@
+# macOS
+.DS_Store
+
 # Node.js (scripts/)
 node_modules/
 npm-debug.log*

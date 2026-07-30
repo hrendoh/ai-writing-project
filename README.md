@@ -38,7 +38,7 @@ node scripts/fetch-reference.mjs <URL> [--type 公式Doc] [--slug 任意のID名
 - 制約: JavaScriptで描画するページ（SPA）やログインが必要なページは取得できないことがあります。
 
 ### 手動で追加する場合
-1. `01_sources/references/REF-01_example.md` をコピーして `REF-xx_スラッグ.md` を作り、URLから**記事の根拠になる事実と原文引用**を書き写します。
+1. `01_sources/references/REF-00_example.md` をコピーして `REF-xx_スラッグ.md` を作り、URLから**記事の根拠になる事実と原文引用**を書き写します。
 2. `01_sources/reference_links.md` の一覧表に1行追加し、`REF-01` から連番でIDを振ります。
 3. 原稿や構成案では `[REF-01]` の形式で出典を示します。
 
