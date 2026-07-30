@@ -41,3 +41,19 @@ node scripts/fetch-reference.mjs <URL> [--type 公式Doc] [--slug 任意のID名
 1. `01_sources/references/REF-01_example.md` をコピーして `REF-xx_スラッグ.md` を作り、URLから**記事の根拠になる事実と原文引用**を書き写します。
 2. `01_sources/reference_links.md` の一覧表に1行追加し、`REF-01` から連番でIDを振ります。
 3. 原稿や構成案では `[REF-01]` の形式で出典を示します。
+
+## 補助ライティングスキルの導入（任意）
+執筆・推敲の品質を上げる補助として、k16shikano氏作の2つのライティングスキルを利用できます（紹介記事: https://note.com/copipetech/n/n3dcdfd95712e ）。
+
+- `japanese-tech-writing`: 日本語技術文書の文章規範（論証の厳密さ、LLMっぽい空句の禁止、冗長の排除など）
+- `cognitive-rhythm-writing`: 説明的な文章に緩急を設計するための規範
+
+導入する場合は、各スキルの `SKILL.md` を入手して以下に配置します。
+
+```
+.claude/skills/japanese-tech-writing/SKILL.md
+.claude/skills/cognitive-rhythm-writing/SKILL.md
+```
+
+- スキル本体は第三者の著作物のためリポジトリにはコミットしません（`.claude/skills/` は `.gitignore` 済み）。
+- スキルと `00_rules/` のルールが衝突した場合の優先順位・解決方法は `00_rules/writing_guidelines.md` の「4. 補助スキルとの併用ルール」に定めています。

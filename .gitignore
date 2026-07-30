@@ -5,3 +5,7 @@ npm-debug.log*
 # 文体トーン抽出用のサンプル記事（著作物のコピーのためコミットしない）
 # 手順: 00_rules/style_extraction_procedure.md
 00_rules/style_samples/
+
+# 補助ライティングスキル（第三者の著作物のためコミットしない）
+# 導入手順: README.md「補助ライティングスキルの導入（任意）」
+.claude/skills/
