@@ -1,6 +1,9 @@
 # macOS
 .DS_Store
 
+# Obsidian（エディタ個人設定のためコミットしない）
+.obsidian/
+
 # Node.js (scripts/)
 node_modules/
 npm-debug.log*
