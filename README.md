@@ -50,11 +50,14 @@ node scripts/fetch-reference.mjs <URL> [--type 公式Doc] [--slug 任意のID名
 - `cognitive-rhythm-writing`: 説明的な文章に緩急を設計するための規範
   https://gist.github.com/k16shikano/eb2929f13ed19c97188393d297be8432
 
-導入する場合は、各gistの `SKILL.md` を取得して以下に配置します。
+導入する場合は、以下のコマンドで各gistの `SKILL.md` を `.claude/skills/` に配置します。
 
-```
-.claude/skills/japanese-tech-writing/SKILL.md
-.claude/skills/cognitive-rhythm-writing/SKILL.md
+```bash
+mkdir -p .claude/skills/japanese-tech-writing .claude/skills/cognitive-rhythm-writing
+curl -sL -o .claude/skills/japanese-tech-writing/SKILL.md \
+  https://gist.githubusercontent.com/k16shikano/fd287c3133457c4fd8f5601d34aa817d/raw/SKILL.md
+curl -sL -o .claude/skills/cognitive-rhythm-writing/SKILL.md \
+  https://gist.githubusercontent.com/k16shikano/eb2929f13ed19c97188393d297be8432/raw/SKILL.md
 ```
 
 - スキル本体は第三者の著作物のためリポジトリにはコミットしません（`.claude/skills/` は `.gitignore` 済み）。
