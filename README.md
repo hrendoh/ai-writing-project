@@ -29,13 +29,13 @@
 cd scripts && npm install && cd ..
 
 # URLを取得して REF-xx を生成
-node scripts/fetch-reference.mjs <URL> [--type 公式Doc] [--slug 任意のID名] [--full]
+node scripts/fetch-reference.mjs <URL> [--type 公式Doc] [--slug 任意のID名] [--full] [--browser]
 ```
 
 - 本文だけを抽出（ナビ・広告等を除去）し、コードブロック（言語付き）・表・画像を保持します。`--full` でページ全体を変換。
 - 画像は `01_sources/references/assets/REF-xx/` に保存され、AIが内容を確認できます（URLリンクのままだとAIは画像を閲覧できません）。
 - 生成後、`REF-xx` ファイルの「記事で使う事実（要約）」は空です。内容を読んで記入するか、Claudeに「`REF-xx` の要約を埋めて」と依頼してください。
-- 制約: JavaScriptで描画するページ（SPA）やログインが必要なページは取得できないことがあります。
+- JavaScriptで描画するページ（SPA）は `--browser` を付けるとヘッドレスChrome（`/Applications/Google Chrome.app`、または `CHROME_PATH`）で描画後のDOMを取得します。Salesforce Help のリリースノートはこのオプションが必要で、URLに `release=26x` を付けないと空ページになります。ログインが必要なページは取得できません。
 
 ### 手動で追加する場合
 1. `01_sources/references/REF-00_example.md` をコピーして `REF-xx_スラッグ.md` を作り、URLから**記事の根拠になる事実と原文引用**を書き写します。

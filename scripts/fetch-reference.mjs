@@ -9,10 +9,16 @@
 //   --slug  抜粋ファイル名の識別子（省略時はタイトル/ホスト名から自動生成）
 //   --type  種別（公式Doc / 仕様 / 技術ブログ / 書籍 など。省略時は「（要確認）」）
 //   --full  本文抽出(Readability)をせずページ全体を変換する
+//   --browser  ヘッドレスChromeでJavaScript描画後のDOMを取得する（SPAページ向け。
+//              Salesforce Help など、通常取得で「Loading」しか返らない場合に使う）
 
 import { readdir, mkdir, readFile, writeFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import path from 'node:path';
+import { execFile } from 'node:child_process';
+import { promisify } from 'node:util';
+import os from 'node:os';
+const execFileP = promisify(execFile);
 
 import { JSDOM } from 'jsdom';
 import { Readability } from '@mozilla/readability';
@@ -32,10 +38,11 @@ const USER_AGENT =
 
 // ---- 引数パース ------------------------------------------------------------
 function parseArgs(argv) {
-  const opts = { url: null, slug: null, type: null, full: false };
+  const opts = { url: null, slug: null, type: null, full: false, browser: false };
   for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--full') opts.full = true;
+    else if (a === '--browser') opts.browser = true;
     else if (a === '--slug') opts.slug = argv[++i];
     else if (a === '--type') opts.type = argv[++i];
     else if (a.startsWith('--')) fail(`不明なオプション: ${a}`);
@@ -98,6 +105,33 @@ async function fetchText(url) {
   } finally {
     clearTimeout(t);
   }
+}
+
+// ヘッドレスChromeでJS描画後のDOMを取得する
+const CHROME_CANDIDATES = [
+  process.env.CHROME_PATH,
+  '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome',
+  '/usr/bin/google-chrome',
+  '/usr/bin/chromium',
+].filter(Boolean);
+
+async function fetchWithBrowser(url) {
+  const { access } = await import('node:fs/promises');
+  let chrome = null;
+  for (const c of CHROME_CANDIDATES) {
+    try { await access(c); chrome = c; break; } catch {}
+  }
+  if (!chrome) fail('Chrome が見つかりません。CHROME_PATH 環境変数で指定してください。');
+  const profile = path.join(os.tmpdir(), 'fetch-reference-chrome-profile');
+  const args = [
+    '--headless=new', '--disable-gpu', '--no-first-run', '--hide-scrollbars',
+    `--user-data-dir=${profile}`,
+    '--virtual-time-budget=20000', '--timeout=60000',
+    '--dump-dom', url,
+  ];
+  const { stdout } = await execFileP(chrome, args, { maxBuffer: 64 * 1024 * 1024 });
+  if (!stdout.trim()) fail(`ヘッドレスChromeが空のDOMを返しました: ${url}`);
+  return stdout;
 }
 
 // ---- 画像保存 --------------------------------------------------------------
@@ -254,7 +288,7 @@ async function main() {
   const date = new Date().toISOString().slice(0, 10);
 
   console.log(`取得中: ${opts.url}`);
-  const html = await fetchText(opts.url);
+  const html = opts.browser ? await fetchWithBrowser(opts.url) : await fetchText(opts.url);
 
   const dom = new JSDOM(html, { url: opts.url });
   const docTitle = dom.window.document.title || '';
