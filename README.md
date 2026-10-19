@@ -62,3 +62,13 @@ curl -sL -o .claude/skills/cognitive-rhythm-writing/SKILL.md \
 
 - スキル本体は第三者の著作物のためリポジトリにはコミットしません（`.claude/skills/` は `.gitignore` 済み）。
 - スキルと `00_rules/` のルールが衝突した場合の優先順位・解決方法は `00_rules/writing_guidelines.md` の「4. 補助スキルとの併用ルール」に定めています。
+
+## note.com への書き出し
+
+Zenn 向けの原稿を note のエディタに貼り付けるための HTML に変換します。
+
+```bash
+node scripts/export-note.mjs 03_drafts/articles/<記事>.md
+```
+
+`<記事>.note.html` が隣に生成されます。frontmatter と `[REF-xx]` / `[NOTE-xx]` の出典マーカーは除去され、`:::message` は引用に、画像は「【画像: …】」の目印に置き換わります。生成した HTML をブラウザで開いて全選択・コピーし、note の記事に貼り付けたあと、目印の位置に `images/` の画像をドラッグ＆ドロップしてください。
