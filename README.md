@@ -64,6 +64,20 @@ curl -sL -o .claude/skills/cognitive-rhythm-writing/SKILL.md \
 - スキル本体は第三者の著作物のためリポジトリにはコミットしません（`.claude/skills/` は `.gitignore` 済み）。
 - スキルと `00_rules/` のルールが衝突した場合の優先順位・解決方法は `00_rules/writing_guidelines.md` の「4. 補助スキルとの併用ルール」に定めています。
 
+## リポジトリをまとめて参照文献にする
+
+自作ツールや製品のリポジトリを一次情報にするときは、複数のファイルとコミット履歴を1つの `REF-xx` にまとめて取り込めます。非公開リポジトリでも `gh api` で取得します（`gh auth login` 済みであること）。
+
+```bash
+node scripts/fetch-repo-reference.mjs <owner>/<repo> [path ...] [--ref main] [--commits 30] [--slug 任意のID名] [--type 種別]
+# 例: README・設計書・レビュー基準と、直近50件のコミット履歴を1つの REF に
+node scripts/fetch-repo-reference.mjs co-meeting/product-quiz README.md docs/design.md review/checklist.md --commits 50
+```
+
+- Markdown ファイルはそのまま、YAML や設定ファイルなどは拡張子を言語にしたコードブロックで収録します。
+- `--commits N` を付けると、日付と件名のコミット履歴を新しい順に N 件収録します。開発の時系列（いつ何を変えたか）を記事の根拠にするときに使います。
+- 1ファイルだけ取り込みたい場合は `fetch-reference.mjs` に `blob` URL を渡しても同じ結果になります。
+
 ## note.com への書き出し
 
 Zenn 向けの原稿を note のエディタに貼り付けるための HTML に変換します。

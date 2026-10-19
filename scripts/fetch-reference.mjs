@@ -440,7 +440,12 @@ async function main() {
   console.log(`\n次のステップ: 「${refId} の要約を埋めて」と依頼するか、手動で「記事で使う事実（要約）」を記入してください。`);
 }
 
-main().catch((e) => {
-  console.error(e);
-  process.exit(1);
-});
+// 他スクリプト（fetch-repo-reference.mjs など）から部品を再利用できるように公開する
+export { nextRefId, appendToIndex, buildRefFile, slugify, ghApi, parseGithubUrl, fetchGithubFileAsMarkdown, REFERENCES_DIR };
+
+if (process.argv[1] && path.resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  main().catch((e) => {
+    console.error(e);
+    process.exit(1);
+  });
+}
