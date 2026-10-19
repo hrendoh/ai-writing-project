@@ -3,21 +3,25 @@
 // 索引(reference_links.md)を自動生成する。画像はローカルに保存する。
 //
 // 使い方:
-//   node scripts/fetch-reference.mjs <URL> [--slug my-slug] [--type 公式Doc] [--full]
+//   node scripts/fetch-reference.mjs <URL> [--slug my-slug] [--type 公式Doc] [--full] [--browser]
 //
 // オプション:
 //   --slug  抜粋ファイル名の識別子（省略時はタイトル/ホスト名から自動生成）
 //   --type  種別（公式Doc / 仕様 / 技術ブログ / 書籍 など。省略時は「（要確認）」）
 //   --full  本文抽出(Readability)をせずページ全体を変換する
 //   --browser  ヘッドレスChromeでJavaScript描画後のDOMを取得する（SPAページ向け。
-//              Salesforce Help など、通常取得で「Loading」しか返らない場合に使う）
+//              Salesforce Help など、通常取得で「Loading」しか返らない場合に使う。
+//              Chrome は環境変数 CHROME_PATH、Google Chrome、Playwright 導入済みブラウザの順に探す）
+//
+// GitHub の非公開リポジトリ (github.com/<owner>/<repo>[/blob/<ref>/<path>]) は HTTP で取得
+// できないため、404 のときは `gh api` で中身を取得する（gh auth login 済みであること）。
 
-import { readdir, mkdir, readFile, writeFile } from 'node:fs/promises';
-import { fileURLToPath } from 'node:url';
-import path from 'node:path';
-import { execFile } from 'node:child_process';
+import { readdir, mkdir, readFile, writeFile, access } from 'node:fs/promises';
+import { execFile, execFileSync } from 'node:child_process';
 import { promisify } from 'node:util';
 import os from 'node:os';
+import { fileURLToPath } from 'node:url';
+import path from 'node:path';
 const execFileP = promisify(execFile);
 
 import { JSDOM } from 'jsdom';
@@ -97,7 +101,10 @@ async function fetchText(url) {
       signal: ctrl.signal,
       headers: { 'User-Agent': USER_AGENT, Accept: 'text/html,application/xhtml+xml' },
     });
-    if (!res.ok) fail(`取得失敗 (HTTP ${res.status}): ${url}`);
+    if (!res.ok) {
+      if (res.status === 404 && parseGithubUrl(url)) return null; // gh api にフォールバック
+      fail(`取得失敗 (HTTP ${res.status}): ${url}`);
+    }
     return await res.text();
   } catch (e) {
     if (e?.name === 'AbortError') fail(`タイムアウト (${FETCH_TIMEOUT_MS}ms): ${url}`);
@@ -107,6 +114,51 @@ async function fetchText(url) {
   }
 }
 
+// ---- GitHub 非公開リポジトリ (gh api) -------------------------------------
+// github.com/<owner>/<repo> はリポジトリの README、
+// github.com/<owner>/<repo>/blob/<ref>/<path> はそのファイルを指すものとして扱う。
+function parseGithubUrl(url) {
+  let u;
+  try {
+    u = new URL(url);
+  } catch {
+    return null;
+  }
+  if (u.hostname !== 'github.com') return null;
+  const seg = u.pathname.split('/').filter(Boolean);
+  if (seg.length < 2) return null;
+  const [owner, repo] = seg;
+  if (seg.length === 2) return { owner, repo, ref: null, path: 'README.md' };
+  if (seg[2] === 'blob' && seg.length >= 5) {
+    return { owner, repo, ref: seg[3], path: seg.slice(4).join('/') };
+  }
+  return null;
+}
+
+function ghApi(endpoint, jq) {
+  const args = ['api', endpoint];
+  if (jq) args.push('--jq', jq);
+  try {
+    return execFileSync('gh', args, { encoding: 'utf8', stdio: ['ignore', 'pipe', 'pipe'] });
+  } catch (e) {
+    const msg = (e.stderr || e.message || '').toString().trim();
+    fail(`gh api に失敗しました (${endpoint}): ${msg}\n  gh がインストール済みで gh auth login 済みか確認してください。`);
+  }
+}
+
+// gh api でファイル本文を取得し、Markdown 化済みのテキストとタイトルを返す。
+// Markdown ファイルはそのまま、それ以外は拡張子を言語としたコードブロックにする。
+function fetchGithubFileAsMarkdown(gh) {
+  const q = gh.ref ? `?ref=${encodeURIComponent(gh.ref)}` : '';
+  const b64 = ghApi(`repos/${gh.owner}/${gh.repo}/contents/${gh.path}${q}`, '.content');
+  const text = Buffer.from(b64.replace(/\s+/g, ''), 'base64').toString('utf8');
+  const ext = path.extname(gh.path).replace('.', '').toLowerCase();
+  const title = `${gh.owner}/${gh.repo}: ${gh.path}`;
+  if (ext === 'md' || ext === 'markdown') return { title, markdown: text.trim() };
+  return { title, markdown: `\`\`\`${ext}\n${text.replace(/\n+$/, '')}\n\`\`\`` };
+}
+
+// ---- ヘッドレス Chrome による描画 (--browser) -------------------------------
 // ヘッドレスChromeでJS描画後のDOMを取得する
 const CHROME_CANDIDATES = [
   process.env.CHROME_PATH,
@@ -115,10 +167,27 @@ const CHROME_CANDIDATES = [
   '/usr/bin/chromium',
 ].filter(Boolean);
 
+// Playwright がインストールした軽量ブラウザ（chrome-headless-shell）も候補に加える。
+// フル版 Chrome が dump-dom 後に終了しない環境でも、こちらは確実に終了する。
+async function playwrightChromeCandidates() {
+  const pw = path.join(os.homedir(), 'Library', 'Caches', 'ms-playwright');
+  const found = [];
+  try {
+    const dirs = (await readdir(pw)).filter((d) => d.startsWith('chromium_headless_shell-')).sort().reverse();
+    for (const d of dirs) {
+      for (const arch of ['mac-arm64', 'mac-x64', 'linux']) {
+        found.push(path.join(pw, d, `chrome-headless-shell-${arch}`, 'chrome-headless-shell'));
+      }
+    }
+  } catch {
+    /* Playwright 未導入 */
+  }
+  return found;
+}
+
 async function fetchWithBrowser(url) {
-  const { access } = await import('node:fs/promises');
   let chrome = null;
-  for (const c of CHROME_CANDIDATES) {
+  for (const c of [...CHROME_CANDIDATES, ...(await playwrightChromeCandidates())]) {
     try { await access(c); chrome = c; break; } catch {}
   }
   if (!chrome) fail('Chrome が見つかりません。CHROME_PATH 環境変数で指定してください。');
@@ -265,18 +334,19 @@ async function appendToIndex({ refId, title, url, type, date, mdFilename }) {
 }
 
 // ---- 抜粋ファイル生成 ------------------------------------------------------
-function buildRefFile({ refId, title, url, date, type, markdown }) {
+function buildRefFile({ refId, title, url, date, type, markdown, via }) {
+  const viaLine = via ? `\n- 取得方法: ${via}` : '';
   return `# ${refId}: ${title}
 
 - URL: ${url}
 - 取得日: ${date}
-- 種別: ${type}
+- 種別: ${type}${viaLine}
 
 ## 記事で使う事実（要約）
 - （この文献から記事の根拠として使う事実を、下の「原文」を読んで箇条書きで記入する）
 
 ## 原文（自動取得）
-<!-- ${url} を ${date} に自動取得・Markdown化したもの。画像は assets/${refId}/ に保存。 -->
+<!-- ${url} を ${date} に自動取得${via ? `（${via}）` : ''}・Markdown化したもの。画像は assets/${refId}/ に保存。 -->
 
 ${markdown}
 `;
@@ -288,7 +358,36 @@ async function main() {
   const date = new Date().toISOString().slice(0, 10);
 
   console.log(`取得中: ${opts.url}`);
-  const html = opts.browser ? await fetchWithBrowser(opts.url) : await fetchText(opts.url);
+  let html = null;
+  let ghFile = null;
+  if (opts.browser) {
+    html = await fetchWithBrowser(opts.url);
+  } else {
+    html = await fetchText(opts.url);
+    if (html === null) {
+      const gh = parseGithubUrl(opts.url);
+      console.log(`  HTTP 404 のため gh api で取得します: ${gh.owner}/${gh.repo} ${gh.path}`);
+      ghFile = fetchGithubFileAsMarkdown(gh);
+    }
+  }
+
+  if (ghFile) {
+    const refId = await nextRefId();
+    const slug = opts.slug ? slugify(opts.slug, opts.url) : slugify(ghFile.title, opts.url);
+    const mdFilename = `${refId}_${slug || 'page'}.md`;
+    const type = opts.type || 'リポジトリ内ファイル';
+    await mkdir(REFERENCES_DIR, { recursive: true });
+    await writeFile(
+      path.join(REFERENCES_DIR, mdFilename),
+      buildRefFile({ refId, title: ghFile.title, url: opts.url, date, type, markdown: ghFile.markdown, via: 'gh api' }),
+    );
+    await appendToIndex({ refId, title: ghFile.title, url: opts.url, type, date, mdFilename });
+    console.log(`\n完了: ${refId}`);
+    console.log(`  抜粋ファイル: 01_sources/references/${mdFilename}`);
+    console.log(`  索引: 01_sources/reference_links.md に追記`);
+    console.log(`\n次のステップ: 「${refId} の要約を埋めて」と依頼するか、手動で「記事で使う事実（要約）」を記入してください。`);
+    return;
+  }
 
   const dom = new JSDOM(html, { url: opts.url });
   const docTitle = dom.window.document.title || '';
@@ -330,7 +429,7 @@ async function main() {
   const markdown = turndown.turndown(contentDoc.body.innerHTML).trim();
 
   const refPath = path.join(REFERENCES_DIR, mdFilename);
-  await writeFile(refPath, buildRefFile({ refId, title, url: opts.url, date, type, markdown }));
+  await writeFile(refPath, buildRefFile({ refId, title, url: opts.url, date, type, markdown, via: opts.browser ? 'ヘッドレス Chrome で描画' : undefined }));
 
   await appendToIndex({ refId, title, url: opts.url, type, date, mdFilename });
 
